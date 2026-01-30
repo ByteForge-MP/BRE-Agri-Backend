@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
 import pdfplumber
@@ -8,6 +9,17 @@ from services.html_reader import extract_data_html
 from services.pdf_reader import extract_data_pdf
 
 app = FastAPI()
+
+# ----------------------------------
+# CORS Configuration
+# ----------------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allow all origins (modify for production)
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods
+    allow_headers=["*"],  # Allow all headers
+)
 
 # ----------------------------------
 # Paths
@@ -54,10 +66,16 @@ def verify_loan(data: LoanRequest):
     loan_folder = os.path.join(DOCUMENTS_DIR, data.loanNumber)
 
     if not os.path.exists(loan_folder):
-        raise HTTPException(
-            status_code=404,
-            detail=f"Loan folder not found: {loan_folder}"
-        )
+        # Create the missing loan folder and return 200 so the client
+        # knows the folder was created and can proceed to upload files.
+        os.makedirs(loan_folder, exist_ok=True)
+
+        return {
+            "loanNumber": data.loanNumber,
+            "documentsFound": 0,
+            "results": [],
+            "message": f"Loan folder not found. Created folder {loan_folder} to proceed."
+        }
 
     results = []
 
